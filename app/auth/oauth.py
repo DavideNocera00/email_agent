@@ -1,7 +1,8 @@
 from google_auth_oauthlib.flow import Flow
 from app.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_SCOPES
 
-def get_flow() -> Flow:
+
+def get_flow(code_verifier: str | None = None) -> Flow:
     client_config = {
         "web": {
             "client_id": GOOGLE_CLIENT_ID,
@@ -11,16 +12,31 @@ def get_flow() -> Flow:
             "redirect_uris": [GOOGLE_REDIRECT_URI],
         }
     }
-    return Flow.from_client_config(client_config, scopes=GOOGLE_SCOPES, redirect_uri=GOOGLE_REDIRECT_URI)
+    flow = Flow.from_client_config(
+        client_config,
+        scopes=GOOGLE_SCOPES,
+        redirect_uri=GOOGLE_REDIRECT_URI,
+    )
+    if code_verifier:
+        flow.code_verifier = code_verifier
+    return flow
 
-# access_type="offline" specifies that we want a refresh token, not only an access token
-def get_authorization_url() -> tuple[str, str]:
-    flow = get_flow()
-    authorization_url, state = flow.authorization_url(access_type="offline",include_granted_scopes="true", prompt="consent")
-    return authorization_url, state
 
-def exchange_code_for_tokens(code: str) -> dict:
+def get_authorization_url() -> tuple[str, str, str]:
     flow = get_flow()
+    authorization_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+    )
+    return authorization_url, state, flow.code_verifier
+
+
+def exchange_code_for_tokens(code: str, code_verifier: str) -> dict:
+    flow = get_flow(code_verifier=code_verifier)
     flow.fetch_token(code=code)
     credentials = flow.credentials
-    return {"access_token": credentials.token, "refresh_token": credentials.refresh_token}
+    return {
+        "access_token": credentials.token,
+        "refresh_token": credentials.refresh_token,
+    }

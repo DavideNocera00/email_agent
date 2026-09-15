@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas import UserOut, UserCreate
 from app import crud
-from app.auth.oauth import get_authorization_url, exchange_code_for_tokens
+from app.auth.oauth import get_authorization_url, exchange_code_for_tokens, get_user_email
 
 app = FastAPI(title="Email Agent API")
 
@@ -39,8 +39,9 @@ def callback(code: str, state: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Invalid state parameter")
 
     code_verifier = oauth_states.pop(state)
-
     tokens = exchange_code_for_tokens(code, code_verifier)
-    print(tokens)
 
-    return {"message": "Login successful", "tokens_received": True}
+    email = get_user_email(tokens["access_token"])
+    user = crud.create_or_update_user(db, email=email, refresh_token=tokens["refresh_token"])
+
+    return {"message": "Login successful", "user_email": user.email, "user_id": user.id}

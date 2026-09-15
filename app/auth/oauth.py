@@ -1,6 +1,8 @@
 from google_auth_oauthlib.flow import Flow
 from app.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_SCOPES
 
+import requests
+
 
 def get_flow(code_verifier: str | None = None) -> Flow:
     client_config = {
@@ -40,3 +42,12 @@ def exchange_code_for_tokens(code: str, code_verifier: str) -> dict:
         "access_token": credentials.token,
         "refresh_token": credentials.refresh_token,
     }
+
+#Retrieve the user's email using the access token
+def get_user_email(access_token: str) -> str:
+    response = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    response.raise_for_status()
+    return response.json()["email"]

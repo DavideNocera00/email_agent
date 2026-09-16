@@ -33,5 +33,14 @@ parser = JsonOutputParser()
 chain = prompt | llm | parser
 
 def summarize_email(email: dict) -> dict:
-    result = chain.invoke({"sender": email["sender"], "subject": email["subject"], "snippet": email["snippet"]})
+    result = chain.invoke({
+        "sender": email["sender"],
+        "subject": email["subject"],
+        "snippet": email["snippet"],
+    })
+
+    # We want to maintain the raw value of the boolen data, not a string
+    raw_value = result.get("requires_action")
+    result["requires_action"] = str(raw_value).strip().lower() == "true"
+
     return result

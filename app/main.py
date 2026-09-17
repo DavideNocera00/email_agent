@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 
 from sqlalchemy.orm import Session
@@ -7,6 +7,8 @@ from app.database import get_db
 from app.schemas import UserOut, UserCreate
 from app import crud
 from app.auth.oauth import get_authorization_url, exchange_code_for_tokens, get_user_email
+from app.models import User
+from app.agent.digest_builder import run_agent_for_user
 
 app = FastAPI(title="Email Agent API")
 
@@ -45,3 +47,20 @@ def callback(code: str, state: str, db: Session = Depends(get_db)):
     user = crud.create_or_update_user(db, email=email, refresh_token=tokens["refresh_token"])
 
     return {"message": "Login successful", "user_email": user.email, "user_id": user.id}
+
+@app.post("/users/{user_id}/run_agent")
+def run_agent(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not user.google_refresh_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not completed Google Login")
+
+    result = run_agent_for_user(user.google_refresh_token)
+    digest = crud.save_digest(db, user.id, result["digest_text"], result["items"])
+
+    return {
+        "digest_id": digest.id,
+        "digest_text": digest.digest_text,
+        "items_count": len(result["items"])
+    }

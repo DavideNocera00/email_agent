@@ -9,12 +9,20 @@ from app import crud
 from app.auth.oauth import get_authorization_url, exchange_code_for_tokens, get_user_email
 from app.models import User
 from app.agent.digest_builder import run_agent_for_user
+from app.scheduler import start_scheduler
 
-app = FastAPI(title="Email Agent API")
+from contextlib import asynccontextmanager
 
 #Temporary in-memory storage for OAuth state (only for development purposes)
 
 oauth_states = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+    yield
+
+app = FastAPI(title="Email Agent API", lifespan=lifespan)
 
 @app.get("/health")
 def health_check():
@@ -48,7 +56,7 @@ def callback(code: str, state: str, db: Session = Depends(get_db)):
 
     return {"message": "Login successful", "user_email": user.email, "user_id": user.id}
 
-@app.post("/users/{user_id}/run_agent")
+@app.post("/cusers/{user_id}/run_agent")
 def run_agent(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
